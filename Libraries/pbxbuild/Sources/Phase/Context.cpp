@@ -219,7 +219,7 @@ Group(std::vector<Phase::File> const &files)
             groupedCommonBase[compiler->identifier()][base].push_back(file);
         } else if (grouping == "ib-base-region-and-strings") {
             /* Only "Base" region files. See below for finding additional grouped files. */
-            if (file.localization() == "Base") {
+            if (file.localization() && *file.localization() == "Base") {
                 groupedBaseRegion.push_back(file);
             } else {
                 ungrouped.push_back(file);
@@ -301,8 +301,8 @@ resolveBuildFiles(
         Phase::File const &first = files.front();
 
         std::string fileOutputDirectory = outputDirectory;
-        if (!first.localization().empty()) {
-            fileOutputDirectory += "/" + first.localization() + ".lproj";
+        if (first.localization()) {
+            fileOutputDirectory += "/" + *first.localization() + ".lproj";
         }
 
         Target::BuildRules::BuildRule::shared_ptr const &buildRule = first.buildRule();
