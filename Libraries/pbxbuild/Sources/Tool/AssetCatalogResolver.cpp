@@ -26,7 +26,7 @@ void Tool::AssetCatalogResolver::
 resolve(
     Tool::Context *toolContext,
     pbxsetting::Environment const &baseEnvironment,
-    std::vector<Phase::File> const &inputs) const
+    std::vector<Tool::Input> const &inputs) const
 {
     /*
      * Create the custom environment with the tool options.
@@ -90,7 +90,7 @@ resolve(
             environment.expand(*_tool->dependencyInfoFile())));
     }
     if (_tool->deeplyStatInputDirectories()) {
-        for (Phase::File const &input : inputs) {
+        for (Tool::Input const &input : inputs) {
             /* Create a dependency info file to track the input directory contents. */
             auto info = Tool::Invocation::DependencyInfo(dependency::DependencyInfoFormat::Directory, input.path());
             dependencyInfo.push_back(info);
