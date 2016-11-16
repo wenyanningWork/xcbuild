@@ -15,10 +15,11 @@ cmake_policy(SET CMP0054 NEW)
 # Platform options.
 if ("${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
   if ("${CMAKE_CXX_PLATFORM_ID}" STREQUAL "MinGW")
+    set(BUILD_SHARED_LIBS True CACHE BOOL "Build shared on Windows." FORCE)
     # TODO: Support shared library build on MinGW.
-    set(BUILD_SHARED_LIBS False CACHE BOOL "MinGW requires hard-to-copy runtime libraries." FORCE)
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static -static-libgcc -static-libstdc++")
-    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -static-libgcc -static-libstdc++")
+    #set(BUILD_SHARED_LIBS False CACHE BOOL "MinGW requires hard-to-copy runtime libraries." FORCE)
+    #set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static -static-libgcc -static-libstdc++")
+    #set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -static-libgcc -static-libstdc++")
 
     # Use MinGW formatting rather than MSVCRT for C99 support.
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -D__USE_MINGW_ANSI_STDIO=1")
