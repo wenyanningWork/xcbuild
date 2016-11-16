@@ -8,6 +8,7 @@
  */
 
 #include <bom/bom.h>
+#include <bom/bom_format.h>
 #include <libutil/Options.h>
 
 #include <memory>
@@ -241,7 +242,7 @@ extern "C" {
       bom_path_type_device = 4  // BOMPathInfo2 is 35 bytes
     };
 
-    struct bom_path_info_2 {
+    __BOM_PACKED_STRUCT_BEGIN struct bom_path_info_2 {
       uint8_t type; // See types above
       uint8_t unknown0; // = 1?
       uint16_t architecture; // Not sure exactly what this means...
@@ -259,17 +260,17 @@ extern "C" {
       char linkName[0];
 
       // FIXME: executable files have a buch of other crap here:
-    } __attribute__((packed));
+    } __BOM_PACKED_STRUCT_END;
 
-    struct bom_path_info_1 {
+    __BOM_PACKED_STRUCT_BEGIN struct bom_path_info_1 {
       uint32_t id;
       uint32_t index; // Pointer to BOMPathInfo2
-    } __attribute__((packed));
+    } __BOM_PACKED_STRUCT_END;
 
-    struct bom_file {
+    __BOM_PACKED_STRUCT_BEGIN struct bom_file {
       uint32_t parent; // Parent BOMPathInfo1->id
       char name[0];
-    } __attribute__((packed));
+    } __BOM_PACKED_STRUCT_END;
 }
 
 int
