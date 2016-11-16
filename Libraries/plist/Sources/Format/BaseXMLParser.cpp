@@ -93,20 +93,6 @@ parse(std::vector<uint8_t> const &contents)
     bool wine = (GetProcAddress(GetModuleHandle("ntdll.dll"), "wine_get_version") != nullptr);
     if (wine) {
         /*
-         * Wine's XmlLite returns the wrong depth after seeing an XML header. Work around by
-         * removing the XML header completely. Should continue to work after Wine is fixed.
-         */
-        static char const *header_start = "<?xml";
-        auto header_start_it = std::search(contents_.begin(), contents_.end(), header_start, header_start + strlen(header_start));
-        if (header_start_it != contents_.end()) {
-            static char const *header_end = "?>";
-            auto header_end_it = std::search(header_start_it, contents_.end(), header_end, header_end + strlen(header_end));
-            if (header_end_it != contents_.end()) {
-                contents_.erase(header_start_it, std::next(header_end_it));
-            }
-        }
-
-        /*
          * Wine's XmlLite can't handle "DOCTYPE PUBLIC" with two parameters. Work around by
          * removing the doctype completely. Should continue to work even after Wine is fixed.
          */
@@ -120,6 +106,11 @@ parse(std::vector<uint8_t> const &contents)
             }
         }
     }
+    /*
+     * Wine's XmlLite calculates depth incorrectly. Rather than adjust the result, use a
+     * custom implementation of depth.
+     */
+    UINT wineDepth = 0;
 
     /*
      * Create memory handle.
@@ -177,6 +168,7 @@ parse(std::vector<uint8_t> const &contents)
 
     XmlNodeType type;
     HRESULT ret = IXmlReader_Read(_reader, &type);
+    fprintf(stderr, "start; wine dpeth is %d\n", wineDepth);
     while (ret == S_OK) {
         /*
          * Get parser depth.
@@ -198,6 +190,7 @@ parse(std::vector<uint8_t> const &contents)
                 break;
             }
             auto element = WideString(elementString, elementString + elementLength);
+            fprintf(stderr, "'--- element is %s ---'\n", WideStringToString(element).c_str());
 
             /*
              * Read all attributes.
@@ -232,14 +225,32 @@ parse(std::vector<uint8_t> const &contents)
                 break;
             }
 
-            /* Check for empty element. Before onStart in case of error. */
+            fprintf(stderr, "\n");
+            fprintf(stderr, "depth: %d\n", depth);
+            /* See above for workaround. */
+            if (wine) {
+                fprintf(stderr, "wine depth: %d\n", depth);
+                depth = wineDepth;
+            }
+
             BOOL empty = IXmlReader_IsEmptyElement(_reader);
             onStartElement(WideStringToString(element), attrs, static_cast<size_t>(depth));
             if (empty) {
-                /* Empty element. */
+                /* Empty element ends immediately. */
                 onEndElement(WideStringToString(element), static_cast<size_t>(depth));
+            } else {
+                /* See above for workaround. */
+                if (wine) {
+                    fprintf(stderr, "increasing wine depth\n");
+                    wineDepth += 1;
+                }
             }
         } else if (type == XmlNodeType_EndElement) {
+            /* See above for workaround. */
+            if (wine) {
+                depth = wineDepth;
+            }
+
             LPCWSTR elementString = nullptr;
             UINT elementLength = 0;
             ret = IXmlReader_GetQualifiedName(_reader, &elementString, &elementLength);
@@ -249,6 +260,11 @@ parse(std::vector<uint8_t> const &contents)
             auto element = WideString(elementString, elementString + elementLength);
 
             onEndElement(WideStringToString(element), static_cast<size_t>(depth));
+
+            /* See above for workaround. */
+            if (wine) {
+                wineDepth -= 1;
+            }
         } else if (type == XmlNodeType_Text) {
             LPCWSTR value = nullptr;
             UINT length = 0;
