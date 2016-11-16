@@ -43,8 +43,8 @@ typedef struct _ABPStreamCallBacks {
 
     void (*close)(void *);
     off_t (*seek)(void *, off_t, int);
-    ssize_t (*read)(void *, void *, size_t);
-    ssize_t (*write)(void *, void const *, size_t);
+    int (*read)(void *, void *, size_t);
+    int (*write)(void *, void const *, size_t);
 } ABPStreamCallBacks;
 
 typedef struct _ABPCreateCallBacks {

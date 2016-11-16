@@ -108,7 +108,7 @@ __ABPReadHeader(ABPContext *context)
 static inline bool
 __ABPReadTrailer(ABPContext *context)
 {
-    if (__ABPSeek(context, -sizeof(context->trailer), SEEK_END) == EOF)
+    if (__ABPSeek(context, -static_cast<off_t>(sizeof(context->trailer)), SEEK_END) == EOF)
         return false;
 
     if (__ABPReadBytes(context, context->trailer.__filler, 8) != 8)

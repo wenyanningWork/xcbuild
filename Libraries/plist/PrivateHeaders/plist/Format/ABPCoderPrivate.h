@@ -120,7 +120,7 @@ __ABPTell(ABPContext *context)
     return __ABPSeek(context, 0, SEEK_CUR);
 }
 
-static inline ssize_t
+static inline int
 __ABPReadBytes(ABPContext *context, void *data, size_t length)
 {
     if (context->streamCallBacks.read == NULL)
@@ -130,7 +130,7 @@ __ABPReadBytes(ABPContext *context, void *data, size_t length)
                 data, length);
 }
 
-static inline ssize_t
+static inline int
 __ABPWriteBytes(ABPContext *context, void const *data, size_t length)
 {
     if (context->streamCallBacks.write == NULL)
@@ -143,24 +143,10 @@ __ABPWriteBytes(ABPContext *context, void const *data, size_t length)
 /* Reader Objects Callback */
 
 static inline void
-__ABPError(ABPContext *context, char const *format, ...)
+__ABPError(ABPContext *context, char const *message)
 {
-    static char const sErrorMessage[] = "file corrupted";
-    va_list  ap;
-    char    *buf;
-
     if (context->createCallBacks.error != NULL) {
-        va_start(ap, format);
-        if (vasprintf(&buf, format, ap) < 0) {
-            buf = (char *)sErrorMessage;
-        }
-        va_end(ap);
-
-        (*(context->createCallBacks.error))(context->createCallBacks.opaque, buf);
-
-        if (buf != sErrorMessage) {
-            free(buf);
-        }
+        (*(context->createCallBacks.error))(context->createCallBacks.opaque, message);
     }
 }
 

@@ -102,7 +102,7 @@ ReadSeek(void *opaque, off_t offset, int whence)
     return self->offset;
 }
 
-static ssize_t
+static int
 ReadData(void *opaque, void *buffer, size_t size)
 {
     auto self = reinterpret_cast <BinaryParseContext *> (opaque);
@@ -366,12 +366,12 @@ WriteSeek(void *opaque, off_t offset, int whence)
     return self->offset;
 }
 
-static ssize_t
+static int
 WriteData(void *opaque, void const *buffer, size_t size)
 {
     auto self = reinterpret_cast <BinaryWriteContext *> (opaque);
 
-    ssize_t needed = (self->contents.size() - self->offset + size);
+    int needed = (self->contents.size() - self->offset + size);
     if (needed > 0) {
         self->contents.resize(self->contents.size() + needed);
     }

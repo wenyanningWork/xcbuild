@@ -309,7 +309,7 @@ _ABPReadObject(ABPContext *context)
             case kABPRecordTypeDictionary:
                 return _ABPReadDictionary(context, byte & 0x0f);
             default:
-                __ABPError(context, "unsupported type id %x", byte);
+                __ABPError(context, "unsupported type id");
                 return NULL;
         }
     }

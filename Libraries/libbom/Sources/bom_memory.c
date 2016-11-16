@@ -12,13 +12,18 @@
 
 #include <bom/bom.h>
 
-#include <sys/mman.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
 #include <string.h>
-#include <unistd.h>
 #include <assert.h>
+
+#if _WIN32
+// TODO mmap
+#else
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
+#endif
 
 static void
 _bom_context_memory_realloc(struct bom_context_memory *memory, size_t size)
@@ -54,7 +59,11 @@ bom_context_memory(void const *data, size_t size)
 }
 
 struct _bom_context_memory_mmap_context {
+#if _WIN32
+    // TODO: mmap
+#else
     int fd;
+#endif
     bool writeable;
 };
 
@@ -63,6 +72,10 @@ _bom_context_memory_mremap(struct bom_context_memory *memory, size_t size)
 {
     struct _bom_context_memory_mmap_context *context = memory->ctx;
 
+#if _WIN32
+    // TODO: mmap
+    (void)context;
+#else
     munmap(memory->data, memory->size);
     if (size > memory->size) {
         int ret = ftruncate(context->fd, size);
@@ -75,6 +88,7 @@ _bom_context_memory_mremap(struct bom_context_memory *memory, size_t size)
     int prot = context->writeable ? PROT_READ | PROT_WRITE : PROT_READ;
     memory->data = mmap(NULL, size, prot, MAP_SHARED, context->fd, 0);
     assert((intptr_t)memory->data != -1);
+#endif
 }
 
 static void
@@ -82,14 +96,31 @@ _bom_context_memory_munmap(struct bom_context_memory *memory)
 {
     struct _bom_context_memory_mmap_context *context = memory->ctx;
 
+#if _WIN32
+    // TODO: mmap
+#else
     munmap(memory->data, memory->size);
     close(context->fd);
+#endif
+
     free(context);
 }
 
 struct bom_context_memory
 bom_context_memory_file(const char *fn, bool writeable, size_t minimum_size)
 {
+#if _WIN32
+    // TODO: mmap
+    (void)_bom_context_memory_mremap;
+    (void)_bom_context_memory_munmap;
+    return (struct bom_context_memory) {
+        .data = NULL,
+        .size = 0,
+        .resize = NULL,
+        .free = NULL,
+        .ctx = NULL,
+    };
+#else
     int fd = open(fn, (writeable ? (O_RDWR | O_CREAT) : O_RDONLY), 0755);
 
     if (fd < 0) {
@@ -135,7 +166,6 @@ bom_context_memory_file(const char *fn, bool writeable, size_t minimum_size)
         .free = _bom_context_memory_munmap,
         .ctx = context,
     };
+#endif
 }
-
-
 

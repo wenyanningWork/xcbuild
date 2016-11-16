@@ -17,6 +17,9 @@
 #include <cstring>
 #include <cerrno>
 
+#if _WIN32
+#include <windows.h>
+#else
 #include <unistd.h>
 #include <libgen.h>
 #include <dirent.h>
@@ -24,20 +27,45 @@
 #if defined(__APPLE__) || defined(__FreeBSD__)
 #include <copyfile.h>
 #endif
+#endif
 
 using libutil::DefaultFilesystem;
 using libutil::Filesystem;
 using libutil::Permissions;
 
+#if _WIN32
+using WideString = std::basic_string<std::remove_const<std::remove_pointer<LPCWSTR>::type>::type>;
+
+static WideString
+StringToWideString(std::string const &str)
+{
+    int size = MultiByteToWideChar(CP_UTF8, 0, str.data(), (int)str.size(), NULL, 0);
+    WideString wide = WideString();
+    wide.resize(size);
+    MultiByteToWideChar(CP_UTF8, 0, str.data(), (int)str.size(), &wide[0], size);
+    return wide;
+}
+#endif
+
 bool DefaultFilesystem::
 exists(std::string const &path) const
 {
+#if _WIN32
+    WideString wide = StringToWideString(path);
+    DWORD attributes = GetFileAttributesW(wide.data());
+    return (attributes != INVALID_FILE_ATTRIBUTES);
+#else
     return ::access(path.c_str(), F_OK) == 0;
+#endif
 }
 
 ext::optional<Filesystem::Type> DefaultFilesystem::
 type(std::string const &path) const
 {
+#if _WIN32
+    // TODO
+    return ext::nullopt;
+#else
     struct stat st;
     if (::lstat(path.c_str(), &st) < 0) {
         return ext::nullopt;
@@ -53,26 +81,43 @@ type(std::string const &path) const
         /* Unsupported file type, e.g. character or block device. */
         return ext::nullopt;
     }
+#endif
 }
 
 bool DefaultFilesystem::
 isReadable(std::string const &path) const
 {
+#if _WIN32
+    // TODO
+    return false;
+#else
     return ::access(path.c_str(), R_OK) == 0;
+#endif
 }
 
 bool DefaultFilesystem::
 isWritable(std::string const &path) const
 {
+#if _WIN32
+    // TODO
+    return false;
+#else
     return ::access(path.c_str(), W_OK) == 0;
+#endif
 }
 
 bool DefaultFilesystem::
 isExecutable(std::string const &path) const
 {
+#if _WIN32
+    // TODO
+    return false;
+#else
     return ::access(path.c_str(), X_OK) == 0;
+#endif
 }
 
+#if !_WIN32
 static Permissions
 ModePermissions(mode_t mode)
 {
@@ -91,40 +136,57 @@ ModePermissions(mode_t mode)
     permissions.other(Permissions::Permission::Execute, (mode & S_IXOTH) != 0);
     return permissions;
 }
+#endif
 
 ext::optional<Permissions> DefaultFilesystem::
 readFilePermissions(std::string const &path) const
 {
+#if _WIN32
+    // TODO
+    return ext::nullopt;
+#else
     struct stat st;
     if (::stat(path.c_str(), &st) < 0) {
         return ext::nullopt;
     }
 
     return ModePermissions(st.st_mode);
+#endif
 }
 
 ext::optional<Permissions> DefaultFilesystem::
 readSymbolicLinkPermissions(std::string const &path) const
 {
+#if _WIN32
+    // TODO
+    return ext::nullopt;
+#else
     struct stat st;
     if (::lstat(path.c_str(), &st) < 0) {
         return ext::nullopt;
     }
 
     return ModePermissions(st.st_mode);
+#endif
 }
 
 ext::optional<Permissions> DefaultFilesystem::
 readDirectoryPermissions(std::string const &path) const
 {
+#if _WIN32
+    // TODO
+    return ext::nullopt;
+#else
     struct stat st;
     if (::stat(path.c_str(), &st) < 0) {
         return ext::nullopt;
     }
 
     return ModePermissions(st.st_mode);
+#endif
 }
 
+#if !_WIN32
 static mode_t
 PermissionsMode(Permissions permissions)
 {
@@ -143,10 +205,15 @@ PermissionsMode(Permissions permissions)
     mode |= (permissions.other(Permissions::Permission::Execute) ? S_IXUSR : 0);
     return mode;
 }
+#endif
 
 bool DefaultFilesystem::
 writeFilePermissions(std::string const &path, Permissions::Operation operation, Permissions permissions)
 {
+#if _WIN32
+    // TODO
+    return false;
+#else
     ext::optional<Permissions> updated = this->readFilePermissions(path);
     if (!updated) {
         return false;
@@ -160,12 +227,16 @@ writeFilePermissions(std::string const &path, Permissions::Operation operation, 
     }
 
     return true;
+#endif
 }
 
 bool DefaultFilesystem::
 writeSymbolicLinkPermissions(std::string const &path, Permissions::Operation operation, Permissions permissions)
 {
-#if defined(__APPLE__) || defined(__FreeBSD__)
+#if _WIN32
+    // TODO
+    return false;
+#elif defined(__APPLE__) || defined(__FreeBSD__)
     ext::optional<Permissions> updated = this->readSymbolicLinkPermissions(path);
     if (!updated) {
         return false;
@@ -194,11 +265,17 @@ writeDirectoryPermissions(std::string const &path, Permissions::Operation operat
     }
 
     updated->combine(operation, permissions);
+
+#if _WIN32
+    // TODO
+    return false;
+#else
     mode_t mode = PermissionsMode(*updated);
 
     if (::chmod(path.c_str(), mode) != 0) {
         return false;
     }
+#endif
 
     if (recursive) {
         bool success = true;
@@ -263,6 +340,10 @@ createFile(std::string const &path)
 bool DefaultFilesystem::
 read(std::vector<uint8_t> *contents, std::string const &path, size_t offset, ext::optional<size_t> length) const
 {
+#if _WIN32
+    // TODO
+    return false;
+#else
     FILE *fp = std::fopen(path.c_str(), "rb");
     if (fp == nullptr) {
         return false;
@@ -280,7 +361,7 @@ read(std::vector<uint8_t> *contents, std::string const &path, size_t offset, ext
     }
 
     if (length) {
-        if (offset + *length > size) {
+        if (offset + *length > static_cast<size_t>(size)) {
             std::fclose(fp);
             return false;
         }
@@ -303,12 +384,18 @@ read(std::vector<uint8_t> *contents, std::string const &path, size_t offset, ext
     }
 
     std::fclose(fp);
+
     return true;
+#endif
 }
 
 bool DefaultFilesystem::
 write(std::vector<uint8_t> const &contents, std::string const &path)
 {
+#if _WIN32
+    // TODO
+    return false;
+#else
     FILE *fp = std::fopen(path.c_str(), "wb");
     if (fp == nullptr) {
         return false;
@@ -324,13 +411,18 @@ write(std::vector<uint8_t> const &contents, std::string const &path)
     }
 
     std::fclose(fp);
+
     return true;
+#endif
 }
 
 bool DefaultFilesystem::
 copyFile(std::string const &from, std::string const &to)
 {
-#if defined(__APPLE__) || defined(__FreeBSD__)
+#if _WIN32
+    // TODO
+    return false;
+#elif defined(__APPLE__) || defined(__FreeBSD__)
     ext::optional<Type> fromType = this->type(from);
     if (fromType != Type::File && fromType != Type::SymbolicLink) {
         return false;
@@ -370,15 +462,24 @@ copyFile(std::string const &from, std::string const &to)
 bool DefaultFilesystem::
 removeFile(std::string const &path)
 {
+#if _WIN32
+    // TODO
+    return false;
+#else
     if (::unlink(path.c_str()) < 0) {
         return false;
     }
     return true;
+#endif
 }
 
 ext::optional<std::string> DefaultFilesystem::
 readSymbolicLink(std::string const &path) const
 {
+#if _WIN32
+    // TODO
+	return ext::nullopt;
+#else
     char buffer[PATH_MAX];
     ssize_t len = ::readlink(path.c_str(), buffer, sizeof(buffer) - 1);
     if (len == -1) {
@@ -387,22 +488,31 @@ readSymbolicLink(std::string const &path) const
 
     buffer[len] = '\0';
     return std::string(buffer);
+#endif
 }
 
 bool DefaultFilesystem::
 writeSymbolicLink(std::string const &target, std::string const &path)
 {
+#if _WIN32
+    // TODO
+    return false;
+#else
     if (::symlink(target.c_str(), path.c_str()) != 0) {
         return false;
     }
 
     return true;
+#endif
 }
 
 bool DefaultFilesystem::
 copySymbolicLink(std::string const &from, std::string const &to)
 {
-#if defined(__APPLE__) || defined(__FreeBSD__)
+#if _WIN32
+    // TODO
+    return false;
+#elif defined(__APPLE__) || defined(__FreeBSD__)
     if (this->type(from) != Type::SymbolicLink) {
         return false;
     }
@@ -430,9 +540,14 @@ bool DefaultFilesystem::
 removeSymbolicLink(std::string const &path)
 {
     if (this->type(path) == Type::SymbolicLink) {
+#if _WIN32
+        // TODO
+        return false;
+#else
         if (::unlink(path.c_str()) != 0) {
             return false;
         }
+#endif
     }
 
     return true;
@@ -441,6 +556,10 @@ removeSymbolicLink(std::string const &path)
 bool DefaultFilesystem::
 createDirectory(std::string const &path, bool recursive)
 {
+#if _WIN32
+    // TODO
+    return false;
+#else
     /* Get and re-set current mode mask. */
     mode_t mask = ::umask(0);
     ::umask(mask);
@@ -475,11 +594,16 @@ createDirectory(std::string const &path, bool recursive)
     }
 
     return true;
+#endif
 }
 
 bool DefaultFilesystem::
 readDirectory(std::string const &path, bool recursive, std::function<void(std::string const &)> const &cb) const
 {
+#if _WIN32
+    // TODO
+    return false;
+#else
     std::function<bool(std::string const &, ext::optional<std::string> const &)> process =
         [this, &recursive, &cb, &process](std::string const &absolute, ext::optional<std::string> const &relative) -> bool {
         DIR *dp = ::opendir(absolute.c_str());
@@ -523,12 +647,16 @@ readDirectory(std::string const &path, bool recursive, std::function<void(std::s
     };
 
     return process(path, ext::nullopt);
+#endif
 }
 
 bool DefaultFilesystem::
 copyDirectory(std::string const &from, std::string const &to, bool recursive)
 {
-#if defined(__APPLE__) || defined(__FreeBSD__)
+#if _WIN32
+    // TODO
+    return false;
+#elif defined(__APPLE__) || defined(__FreeBSD__)
     if (this->type(from) != Type::Directory) {
         return false;
     }
@@ -555,6 +683,10 @@ copyDirectory(std::string const &from, std::string const &to, bool recursive)
 bool DefaultFilesystem::
 removeDirectory(std::string const &path, bool recursive)
 {
+#if _WIN32
+    // TODO
+    return false;
+#else
     if (recursive) {
         bool success = true;
 
@@ -600,15 +732,21 @@ removeDirectory(std::string const &path, bool recursive)
     }
 
     return true;
+#endif
 }
 
 std::string DefaultFilesystem::
 resolvePath(std::string const &path) const
 {
+#if _WIN32
+    // TODO
+    return std::string();
+#else
     char realPath[PATH_MAX + 1];
     if (::realpath(path.c_str(), realPath) == nullptr) {
         return std::string();
     } else {
         return realPath;
     }
+#endif
 }
